@@ -1,0 +1,36 @@
+[pager]
+    diff = delta
+    log = delta
+    reflog = delta
+    show = delta
+
+[delta]
+    features = myconfig line-number minus-plus
+    whitespace-error-style = 22 reverse
+
+[delta "myconfig"]
+    syntax-theme = "gruvbox-dark"
+    navigate = true
+    commit-decoration-style = bold yellow ul
+    file-style = bold yellow ul
+    file-decoration-style = none
+    hunk-header-decoration-style = yellow ol
+
+[delta "line-number"]
+    line-numbers = true
+    line-numbers-left-style = cyan
+    line-numbers-left-format = "{nm:^3}⋮"
+    line-numbers-right-style = cyan
+    line-numbers-right-format = "{np:^3}│ "
+    line-numbers-minus-style = "#B10036"
+    line-numbers-plus-style = "#03a4ff"
+    line-numbers-zero-style = "#999999"
+
+[delta "minus-plus"]
+    minus-style = syntax "#bd2828"
+    minus-emph-style = syntax bold ul "#d11b06"
+    plus-style = syntax "#066b2a"
+    plus-emph-style = syntax bold "#058040"
+
+[interactive]
+    diffFilter = delta --color-only

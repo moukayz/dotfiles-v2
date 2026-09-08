@@ -1,0 +1,15 @@
+package bass
+package colored-man-pages
+package foreign-env
+package git-flow
+theme batman
+theme default
+theme eden
+theme fox
+theme lambda
+theme mars
+theme ocean
+theme pure
+theme random
+theme rider
+theme wolf-theme

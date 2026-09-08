@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+pane="${1:-${TMUX_PANE:-}}"
+if [[ -z "$pane" ]]; then
+    echo "tmux-ssh-split must be run from a tmux pane" >&2
+    exit 1
+fi
+
+tty="$(tmux display-message -p -t "$pane" '#{pane_tty}')"
+ssh_pid="$(
+    ps -t "$tty" -o pid=,comm= |
+        awk '$2 ~ /(^|\/)ssh$/ { pid = $1 } END { print pid }'
+)"
+
+if [[ -z "$ssh_pid" ]]; then
+    tmux display-message -t "$pane" "No active SSH command found in this pane"
+    exit 1
+fi
+
+ssh_command="$(ps -ww -p "$ssh_pid" -o command=)"
+working_directory="$(tmux display-message -p -t "$pane" '#{pane_current_path}')"
+
+tmux split-window -h -t "$pane" -c "$working_directory" "$ssh_command"

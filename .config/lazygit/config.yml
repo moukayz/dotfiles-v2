@@ -1,0 +1,23 @@
+git:
+  branchLogCmd: "git log --graph --color=always --abbrev-commit --decorate --date=relative --pretty=medium --oneline {{branchName}} --"
+  diffRenderers:
+    - colorArg: always
+      command: delta --dark --paging=never -s
+gui:
+  sidePanelWidth: 0.2 # number from 0 to 1
+  expandFocusedSidePanel: true
+  showBottomLine: false # for hiding the bottom information line (unless it has important information to tell you)
+  nerdFontsVersion: "3"
+  theme:
+    selectedLineBgColor:
+      - reverse
+    selectedRangeBgColor:
+      - reverse
+keybinding:
+  universal:
+    prevBlock-alt: 'K' # goto the previous block / panel
+    nextBlock-alt: 'J' # goto the next block / panel
+    return: 'h' # return to previous menu, will quit if there's nowhere to return
+    goInto: 'l'
+    scrollUpMain-alt1: '' # main panel scroll up
+    scrollDownMain-alt1: '' # main panel scroll down
