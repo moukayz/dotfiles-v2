@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Install dependencies explicitly; normal bootstrap does not run a package manager.
+# --packages installs the broader Homebrew toolset; the picker dependencies
+# below are always ensured, including during plain `yadm bootstrap`.
 if [[ "${1:-}" == "--packages" ]]; then
     command -v brew >/dev/null || { echo 'Install dependencies using your OS package manager; see README.md.' >&2; exit 1; }
     brew install fish tmux git-delta fzf fd ripgrep bat lazygit neovim rbenv
@@ -10,14 +11,73 @@ elif [[ $# -gt 0 ]]; then
     exit 1
 fi
 
+export PATH="$HOME/.local/bin:$PATH"
+missing_picker_packages=()
+command -v fzf >/dev/null || missing_picker_packages+=(fzf)
+if ! command -v fd >/dev/null && ! command -v fdfind >/dev/null; then
+    if command -v brew >/dev/null; then
+        missing_picker_packages+=(fd)
+    else
+        missing_picker_packages+=(fd-find)
+    fi
+fi
+if [[ ${#missing_picker_packages[@]} -gt 0 ]]; then
+    if command -v brew >/dev/null; then
+        brew install "${missing_picker_packages[@]}"
+    elif command -v apt-get >/dev/null; then
+        if [[ $(id -u) -eq 0 ]]; then
+            apt-get install -y "${missing_picker_packages[@]}"
+        else
+            sudo apt-get install -y "${missing_picker_packages[@]}"
+        fi
+    else
+        echo 'Install fzf and fd with your OS package manager, then rerun bootstrap.' >&2
+        exit 1
+    fi
+fi
+if ! command -v fd >/dev/null && command -v fdfind >/dev/null; then
+    mkdir -p "$HOME/.local/bin"
+    # Do not overwrite an existing file or dangling link.
+    ln -s "$(command -v fdfind)" "$HOME/.local/bin/fd"
+fi
+command -v fzf >/dev/null && command -v fd >/dev/null || {
+    echo 'fzf or fd is still unavailable after installation.' >&2
+    exit 1
+}
+fzf --version
+fd --version
+
+command -v fish >/dev/null || {
+    echo 'Fish is required for Oh My Fish. Install fish with your OS package manager, then rerun yadm bootstrap.' >&2
+    exit 1
+}
+
+config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
+omf_root="${XDG_DATA_HOME:-$HOME/.local/share}/omf"
+if [[ ! -f "$omf_root/init.fish" ]]; then
+    if [[ -e "$omf_root" ]]; then
+        echo "Incomplete Oh My Fish directory: $omf_root; inspect it before retrying." >&2
+        exit 1
+    fi
+    mkdir -p "$(dirname "$omf_root")"
+    git clone https://github.com/oh-my-fish/oh-my-fish.git "$omf_root"
+fi
+# The tracked conf.d/omf.fish already supplies the startup hook. Avoid the
+# installer overwriting it and suppress our first-start automatic installation.
+env OMF_PATH="$omf_root" OMF_CONFIG="$config_root/omf" OMF_PLUGIN_UPDATED=1 \
+    fish --no-config -c 'source "$OMF_PATH/init.fish"; or exit 1; omf install; or exit 1'
+# --no-config does not persist universal variables. Use a normal Fish process
+# with the marker already exported to avoid another first-start install.
+env OMF_PLUGIN_UPDATED=1 fish -c 'set -Ux OMF_PLUGIN_UPDATED 1'
+
 delta_include='~/.config/git/delta.gitconfig'
 if ! git config --global --get-all include.path | grep -Fxq "$delta_include"; then
     git config --global --add include.path "$delta_include"
 fi
 
-config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
 if [[ ! -e "$config_root/nvim-lite" ]]; then
     git clone git@github.com:moukayz/nvim-lite.git "$config_root/nvim-lite"
 fi
 echo 'Delta include configured; existing nvim-lite checkouts are preserved.'
-echo 'Install Oh My Fish and Fisher as described in README.md before using the shell setup.'
+echo 'Oh My Fish and its bundle are installed; the login shell is unchanged.'
+echo 'Fisher remains optional; see README.md.'

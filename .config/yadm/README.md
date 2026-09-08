@@ -15,13 +15,21 @@ Bootstrap adds the Delta include to the untracked local `.gitconfig` and clones
 the separate private `moukayz/nvim-lite` repository only if its directory is absent.
 It requires GitHub SSH access. It does not update existing Neovim checkouts.
 
-On Homebrew machines, `yadm bootstrap --packages` also installs the command-line
-dependencies. On Linux, install equivalents through the OS package manager.
+Plain bootstrap installs missing `fzf` and `fd` using Homebrew or Debian/Ubuntu
+`apt-get` (using sudo when needed). For Debian's `fdfind` executable, it creates
+`~/.local/bin/fd` without overwriting existing files. Keep `~/.local/bin` on your
+shell PATH. Existing commands are preserved; repeated runs skip installation.
+On other systems, missing picker dependencies produce an explicit error.
+
+On Homebrew machines, `~/.config/yadm/bootstrap --packages` also installs the broader
+command-line toolset. On Linux, install other tools through the OS package manager.
 The Neovim profile requires Neovim 0.12 and language servers appropriate to your projects.
 Ghostty and Hack Nerd Font Mono are separate terminal/font prerequisites.
 
-Fish uses Oh My Fish at `~/.local/share/omf`. Install it following
-https://github.com/oh-my-fish/oh-my-fish and restore packages with `omf install`.
+Install Fish first. Bootstrap installs missing Oh My Fish at `~/.local/share/omf`
+(or `$XDG_DATA_HOME/omf`) and restores packages with `omf install`. It preserves
+existing installations and does not change the login shell. GitHub access is
+required for missing framework/packages; failures stop bootstrap for retry.
 Its package list is `.config/omf/bundle`, and the selected theme is `rider`.
 Install Fisher following https://github.com/jorgebucaran/fisher and run `fisher update`
 to restore `.config/fish/fish_plugins` (currently Fisher itself).
