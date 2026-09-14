@@ -1,83 +1,91 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-# --packages installs the broader Homebrew toolset; the picker dependencies
-# below are always ensured, including during plain `yadm bootstrap`.
-if [[ "${1:-}" == "--packages" ]]; then
-    command -v brew >/dev/null || { echo 'Install dependencies using your OS package manager; see README.md.' >&2; exit 1; }
-    brew install fish tmux git-delta fzf fd ripgrep bat lazygit neovim rbenv
-elif [[ $# -gt 0 ]]; then
-    echo 'Usage: yadm bootstrap [--packages]' >&2
-    exit 1
-fi
-
-export PATH="$HOME/.local/bin:$PATH"
-missing_picker_packages=()
-command -v fzf >/dev/null || missing_picker_packages+=(fzf)
-if ! command -v fd >/dev/null && ! command -v fdfind >/dev/null; then
-    if command -v brew >/dev/null; then
-        missing_picker_packages+=(fd)
-    else
-        missing_picker_packages+=(fd-find)
-    fi
-fi
-if [[ ${#missing_picker_packages[@]} -gt 0 ]]; then
-    if command -v brew >/dev/null; then
-        brew install "${missing_picker_packages[@]}"
-    elif command -v apt-get >/dev/null; then
-        if [[ $(id -u) -eq 0 ]]; then
-            apt-get install -y "${missing_picker_packages[@]}"
-        else
-            sudo apt-get install -y "${missing_picker_packages[@]}"
-        fi
-    else
-        echo 'Install fzf and fd with your OS package manager, then rerun bootstrap.' >&2
-        exit 1
-    fi
-fi
-if ! command -v fd >/dev/null && command -v fdfind >/dev/null; then
-    mkdir -p "$HOME/.local/bin"
-    # Do not overwrite an existing file or dangling link.
-    ln -s "$(command -v fdfind)" "$HOME/.local/bin/fd"
-fi
-command -v fzf >/dev/null && command -v fd >/dev/null || {
-    echo 'fzf or fd is still unavailable after installation.' >&2
-    exit 1
+trap 'echo "Bootstrap FAILED at line $LINENO. Fix the error and rerun yadm bootstrap." >&2' ERR
+[[ $# == 0 || ( $# == 1 && "$1" == --packages ) ]] || {
+    echo 'Usage: yadm bootstrap [--packages] (core packages are always installed)' >&2; exit 1;
 }
-fzf --version
-fd --version
-
-command -v fish >/dev/null || {
-    echo 'Fish is required for Oh My Fish. Install fish with your OS package manager, then rerun yadm bootstrap.' >&2
-    exit 1
-}
-
 config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
+[[ "$config_root" == "$HOME/.config" ]] || { echo 'This profile uses ~/.config.' >&2; exit 1; }
+export PATH="$HOME/.local/bin:$PATH"
+export GIT_TERMINAL_PROMPT=0
+unset GIT_DIR GIT_WORK_TREE GIT_COMMON_DIR GIT_INDEX_FILE
+mkdir -p "$HOME/.local/bin"
+task_tmp=$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-bootstrap.XXXXXX")
+cleanup() {
+    if [[ -S "$task_tmp/tmux.sock" ]]; then tmux -S "$task_tmp/tmux.sock" kill-server || true; fi
+    rm -rf -- "$task_tmp"
+}
+trap cleanup EXIT
+version_at_least() {
+    awk -v actual="$1" -v minimum="$2" 'BEGIN {
+        split(actual,a,"."); split(minimum,b,".");
+        for(i=1;i<=3;i++){if(a[i]+0>b[i]+0)exit 0;if(a[i]+0<b[i]+0)exit 1} exit 0
+    }'
+}
+tool_version() { "$1" --version | sed -n '1s/^[^0-9]*\([0-9][0-9.a-z]*\).*/\1/p'; }
+case "$(uname -s)" in
+    Darwin)
+        for brew_bin in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+            if [[ -x "$brew_bin" ]]; then eval "$("$brew_bin" shellenv)"; break; fi
+        done
+        command -v brew >/dev/null || { echo 'Install Homebrew first: https://brew.sh' >&2; exit 1; }
+        xcrun --find clang >/dev/null || { echo 'Run xcode-select --install first.' >&2; exit 1; }
+        brew install git yadm fish tmux git-delta fzf fd ripgrep bat lazygit neovim tree-sitter-cli bc
+        for spec in 'nvim neovim 0.12.0' 'fzf fzf 0.60.0' 'tree-sitter tree-sitter-cli 0.26.1'; do
+            read -r tool formula minimum <<< "$spec"
+            if ! version_at_least "$(tool_version "$tool")" "$minimum"; then brew upgrade "$formula"; fi
+        done
+        if ! version_at_least "$(tmux -V | cut -d' ' -f2)" 3.5; then brew upgrade tmux; fi
+        ;;
+    Linux)
+        # shellcheck source=/dev/null
+        source "$config_root/yadm/bootstrap-linux.sh"
+        ;;
+    *) echo 'Unsupported OS; use macOS/Homebrew or Debian/Ubuntu.' >&2; exit 1 ;;
+esac
+for tool in git yadm fish tmux delta fzf fd rg bat lazygit nvim tree-sitter curl tar cc bc; do
+    command -v "$tool" >/dev/null || { echo "Missing required command: $tool" >&2; exit 1; }
+done
+version_at_least "$(tool_version nvim)" 0.12.0
+version_at_least "$(tool_version fzf)" 0.60.0
+version_at_least "$(tool_version tree-sitter)" 0.26.1
+version_at_least "$(tmux -V | cut -d' ' -f2)" 3.5
+
+echo 'Setting up Oh My Fish and declared packages…'
 omf_root="${XDG_DATA_HOME:-$HOME/.local/share}/omf"
 if [[ ! -f "$omf_root/init.fish" ]]; then
-    if [[ -e "$omf_root" ]]; then
-        echo "Incomplete Oh My Fish directory: $omf_root; inspect it before retrying." >&2
-        exit 1
-    fi
+    [[ ! -e "$omf_root" ]] || { echo "Incomplete OMF directory: $omf_root" >&2; exit 1; }
     mkdir -p "$(dirname "$omf_root")"
     git clone https://github.com/oh-my-fish/oh-my-fish.git "$omf_root"
 fi
-# The tracked conf.d/omf.fish already supplies the startup hook. Avoid the
-# installer overwriting it and suppress our first-start automatic installation.
 env OMF_PATH="$omf_root" OMF_CONFIG="$config_root/omf" OMF_PLUGIN_UPDATED=1 \
-    fish --no-config -c 'source "$OMF_PATH/init.fish"; or exit 1; omf install; or exit 1'
-# --no-config does not persist universal variables. Use a normal Fish process
-# with the marker already exported to avoid another first-start install.
-env OMF_PLUGIN_UPDATED=1 fish -c 'set -Ux OMF_PLUGIN_UPDATED 1'
+    fish -c 'type -q omf; or exit 1; omf install; or exit 1'
+env OMF_PLUGIN_UPDATED=1 fish -c 'set -Ux OMF_PLUGIN_UPDATED 1; functions -q lnvim; or exit 1'
 
+# Git expands this tilde when reading include.path, on every client.
+# shellcheck disable=SC2088
 delta_include='~/.config/git/delta.gitconfig'
 if ! git config --global --get-all include.path | grep -Fxq "$delta_include"; then
     git config --global --add include.path "$delta_include"
 fi
 
+echo 'Installing missing tmux plugins (existing plugins are preserved)…'
+tpm_root="$HOME/.tmux/plugins/tpm"
+if [[ ! -e "$tpm_root" ]]; then git clone https://github.com/tmux-plugins/tpm "$tpm_root"; fi
+[[ -x "$tpm_root/bin/install_plugins" ]] || { echo "Incomplete TPM directory: $tpm_root" >&2; exit 1; }
+# TPM reads ~/.tmux.conf. A private server prevents touching live sessions.
+tmux -S "$task_tmp/tmux.sock" -f /dev/null new-session -d -s bootstrap 'sleep 600'
+tmux -S "$task_tmp/tmux.sock" set-environment -g TMUX_PLUGIN_MANAGER_PATH "$HOME/.tmux/plugins"
+private_tmux=$(tmux -S "$task_tmp/tmux.sock" display-message -p '#{socket_path},#{pid},0')
+env TMUX="$private_tmux" bash "$tpm_root/bin/install_plugins"
+
+echo 'Setting up the separate Neovim profile…'
 if [[ ! -e "$config_root/nvim-lite" ]]; then
-    git clone git@github.com:moukayz/nvim-lite.git "$config_root/nvim-lite"
+    git clone https://github.com/moukayz/nvim-lite.git "$config_root/nvim-lite"
 fi
-echo 'Delta include configured; existing nvim-lite checkouts are preserved.'
-echo 'Oh My Fish and its bundle are installed; the login shell is unchanged.'
-echo 'Fisher remains optional; see README.md.'
+[[ -f "$config_root/nvim-lite/init.lua" ]] || { echo 'Existing nvim-lite is not a valid profile; preserved for inspection.' >&2; exit 1; }
+env NVIM_APPNAME=nvim-lite nvim --headless -i NONE -u NONE \
+    +'lua dofile(vim.env.HOME .. "/.config/yadm/bootstrap-nvim.lua")'
+echo 'Bootstrap OK: CLI tools, OMF, tmux plugins, Neovim plugins and configured parsers verified.'
+echo 'Start a new fish shell, then tmux and lnvim. Existing checkouts and login shell were preserved.'
+echo 'Optional/manual: LSP servers, Fisher, agent CLIs and authentication, terminal app and Nerd Font.'
