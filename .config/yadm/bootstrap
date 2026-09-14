@@ -30,7 +30,7 @@ case "$(uname -s)" in
         done
         command -v brew >/dev/null || { echo 'Install Homebrew first: https://brew.sh' >&2; exit 1; }
         xcrun --find clang >/dev/null || { echo 'Run xcode-select --install first.' >&2; exit 1; }
-        brew install git yadm fish tmux git-delta fzf fd ripgrep bat lazygit neovim tree-sitter-cli bc
+        brew install git yadm fish tmux git-delta fzf fd ripgrep bat lazygit neovim tree-sitter-cli bc python
         for spec in 'nvim neovim 0.12.0' 'fzf fzf 0.60.0' 'tree-sitter tree-sitter-cli 0.26.1'; do
             read -r tool formula minimum <<< "$spec"
             if ! version_at_least "$(tool_version "$tool")" "$minimum"; then brew upgrade "$formula"; fi
@@ -43,7 +43,7 @@ case "$(uname -s)" in
         ;;
     *) echo 'Unsupported OS; use macOS/Homebrew or Debian/Ubuntu.' >&2; exit 1 ;;
 esac
-for tool in git yadm fish tmux delta fzf fd rg bat lazygit nvim tree-sitter curl tar cc bc; do
+for tool in git yadm ssh python3 less fish tmux delta fzf fd rg bat lazygit nvim tree-sitter curl tar cc bc; do
     command -v "$tool" >/dev/null || { echo "Missing required command: $tool" >&2; exit 1; }
 done
 version_at_least "$(tool_version nvim)" 0.12.0

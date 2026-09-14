@@ -9,7 +9,7 @@ esac
 privilege=()
 if [[ $(id -u) != 0 ]]; then command -v sudo >/dev/null; privilege=(sudo); fi
 packages=()
-for package in git yadm ca-certificates curl jq tar gzip xz-utils unzip build-essential pkg-config \
+for package in git yadm openssh-client python3 less ca-certificates curl jq tar gzip xz-utils unzip build-essential pkg-config \
     libevent-dev libncurses-dev bison fish tmux bc fd-find ripgrep bat locales ncurses-term; do
     [[ $(dpkg-query -W -f='${Status}' "$package" 2>/dev/null || true) == 'install ok installed' ]] || packages+=("$package")
 done

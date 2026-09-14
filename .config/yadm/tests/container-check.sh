@@ -2,7 +2,7 @@
 # Run only inside the disposable test container, after bootstrap.
 set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
-for command in git yadm fish tmux delta fzf fd rg bat lazygit nvim tree-sitter cc; do
+for command in git yadm ssh python3 less fish tmux delta fzf fd rg bat lazygit nvim tree-sitter cc; do
     command -v "$command"
 done
 fish -ic 'functions -q lnvim; or exit 1; command -q fd; or exit 1; command -q nvim; or exit 1'

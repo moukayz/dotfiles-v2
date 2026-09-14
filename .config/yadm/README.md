@@ -44,6 +44,7 @@ Plain `yadm bootstrap` now ensures the core setup; the old `--packages` argument
 is accepted for compatibility but no longer required.
 
 - CLI tools: Git, yadm, Fish, tmux, Delta, fzf, fd, ripgrep, bat, Lazygit, Neovim.
+- SSH for the tmux SSH helper, Python for OMF's bass bridge, and the less pager.
 - Tree-sitter CLI, compiler and download/build prerequisites.
 - OMF and the tracked bundle/themes; verifies the `lnvim` alias loads.
 - TPM plus missing declared tmux plugins, even when TPM already exists.
